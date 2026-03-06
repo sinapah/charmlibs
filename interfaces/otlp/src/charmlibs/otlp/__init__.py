@@ -70,9 +70,7 @@ Consumer Side (Charms consuming OTLP endpoints)
 To consume OTLP endpoints, use the ``OtlpConsumer`` class. The OTLP sender may only support a
 subset of protocols and telemetries, which can be configured at instantiation::
 
-    from charmlibs.interfaces.otlp import OtlpConsumer, RulesInput
-    from cosl.juju_topology import JujuTopology
-    from cosl.rules import AlertRules
+    from charmlibs.interfaces.otlp import AlertRules, JujuTopology, OtlpConsumer, RulesInput
 
     class MyOtlpSender(CharmBase):
         def __init__(self, *args):
