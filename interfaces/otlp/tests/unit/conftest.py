@@ -49,7 +49,6 @@ class OtlpConsumerCharm(CharmBase):
             self,
             protocols=['http', 'grpc'],
             telemetries=['metrics', 'logs'],
-            # TODO: Require kwargs for dataclass?
             rules=RulesInput(loki=loki_rules, prometheus=prom_rules),
         )
         self.framework.observe(self.on.update_status, self._on_update_status)
