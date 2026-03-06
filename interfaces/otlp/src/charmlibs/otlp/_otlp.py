@@ -207,12 +207,10 @@ class OtlpConsumer(Object):
             rules['promql'] = self._rules.prometheus.as_dict()
 
         # Publish to databag
-        databag = OtlpConsumerAppData.model_validate(
-            {
-                'rules': rules,
-                'metadata': self._topology.as_dict(),
-            }
-        )
+        databag = OtlpConsumerAppData.model_validate({
+            'rules': rules,
+            'metadata': self._topology.as_dict(),
+        })
         for relation in self.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app, encoder=OtlpConsumerAppData.encode_value)
 
