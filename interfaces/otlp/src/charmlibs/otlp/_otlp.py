@@ -32,6 +32,7 @@ from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
 from cosl.rules import AlertRules, InjectResult, generic_alert_groups
+from cosl.types import OfficialRuleFileFormat
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
@@ -49,11 +50,11 @@ logger = logging.getLogger(__name__)
 class RulesModel(BaseModel):
     """Rules of various formats (query languages) to support in the relation databag."""
 
-    logql: dict[str, Any] = Field(
+    logql: OfficialRuleFileFormat = Field(
         description='LogQL alerting and recording rules, following the '
         'OfficialRuleFileFormat from cos-lib.'
     )
-    promql: dict[str, Any] = Field(
+    promql: OfficialRuleFileFormat = Field(
         description='PromQL alerting and recording rules, following the '
         'OfficialRuleFileFormat from cos-lib.'
     )
@@ -88,14 +89,11 @@ class OtlpConsumerAppData(BaseModel):
     ```bash
     <rules-from-show-unit> | base64 -d | xz -d | jq
     ```
-    rules: a dictionary of rules following the OfficialRuleFileFormat from cos-lib,
-      indexed by query type (e.g. logql, promql).
-    metadata: Juju topology of the current charm, used for labeling rule expressions and labels.
     """
 
     rules: RulesModel | str = Field(
-        description='Alerting and recording rules to be forwarded to the provider.'
-        ' Stored as an LZMA-compressed, base64-encoded JSON string when the payload is large.'
+        description='Rules to be forwarded to the provider.'
+        ' Stored as an LZMA-compressed, base64-encoded JSON string to reduce payload size.'
     )
     metadata: OrderedDict[str, str] = Field(
         description='Juju topology of the consumer charm (e.g. model, app, unit),'
@@ -104,7 +102,11 @@ class OtlpConsumerAppData(BaseModel):
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
-        """Decode relation data values using BaseModel validation."""
+        """Decode a relation databag value from its serialized string form.
+
+        Attempts to decompress and deserialize the value as a ``RulesModel``, falls back to
+        plain JSON deserialization.
+        """
         try:
             decompressed = LZMABase64.decompress(json_str)
             return RulesModel.model_validate(json.loads(decompressed))
