@@ -34,7 +34,7 @@ from cosl.rules import AlertRules, InjectResult, generic_alert_groups
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ValidationError
 
 DEFAULT_CONSUMER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
@@ -46,9 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 class RulesModel(BaseModel):
-    """A pydantic model for all rule formats."""
-
-    model_config = ConfigDict(extra='forbid')
+    """Rules of various formats (query languages) to support in the relation databag."""
 
     logql: dict[str, Any]
     promql: dict[str, Any]
@@ -57,23 +55,19 @@ class RulesModel(BaseModel):
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    model_config = ConfigDict(extra='forbid')
-
     protocol: Literal['http', 'grpc']
     endpoint: str
     telemetries: Sequence[Literal['logs', 'metrics', 'traces']]
 
 
 class OtlpProviderAppData(BaseModel):
-    """A pydantic model for the OTLP provider's unit databag."""
-
-    model_config = ConfigDict(extra='forbid')
+    """A pydantic model for the OTLP provider's app databag."""
 
     endpoints: list[OtlpEndpoint]
 
 
 class OtlpConsumerAppData(BaseModel):
-    """A pydantic model for the OTLP consumer's unit databag.
+    """A pydantic model for the OTLP consumer's app databag.
 
     The rules are compressed when saved to databag to avoid hitting databag
     size limits for large deployments. An admin can decode the rules using the
@@ -81,9 +75,9 @@ class OtlpConsumerAppData(BaseModel):
     ```bash
     <rules-from-show-unit> | base64 -d | xz -d | jq
     ```
+    rules: a dictionary of rules following the OfficialRuleFileFormat from cos-lib, indexed by query type (e.g. logql, promql).
+    metadata: Juju topology of the current charm, used for labeling rule expressions and labels.
     """
-
-    model_config = ConfigDict(extra='forbid')
 
     rules: RulesModel | str
     metadata: OrderedDict[str, str]
@@ -102,7 +96,10 @@ class OtlpConsumerAppData(BaseModel):
 
     @staticmethod
     def encode_value(obj: Any) -> str:
-        """Encode relation data values using BaseModel serialization."""
+        """Encode relation data values into a string.
+        
+        Rules are LZMA-compressed and base64-encoded to reduce content size for larger deployments. Other data is serialized into a JSON formatted str.
+        """
         try:
             RulesModel.model_validate(obj)
             return LZMABase64.compress(json.dumps(obj, sort_keys=True))
