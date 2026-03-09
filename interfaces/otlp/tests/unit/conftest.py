@@ -24,11 +24,11 @@ from unittest.mock import patch
 import ops
 import pytest
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules
+from cosl.rules import MyRules
 from ops import testing
 from ops.charm import CharmBase
 
-from charmlibs.otlp import OtlpConsumer, OtlpProvider, RulesInput
+from charmlibs.otlp import OtlpConsumer, OtlpProvider
 from helpers import add_alerts, patch_cos_tool_path
 
 logger = logging.getLogger(__name__)
@@ -43,13 +43,11 @@ class OtlpConsumerCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
         topology = JujuTopology.from_charm(self)
-        loki_rules = AlertRules(query_type='logql', topology=topology)
-        prom_rules = AlertRules(query_type='promql', topology=topology)
         self.otlp_consumer = OtlpConsumer(
             self,
             protocols=['http', 'grpc'],
             telemetries=['metrics', 'logs'],
-            rules=RulesInput(loki=loki_rules, prometheus=prom_rules),
+            rules=MyRules(topology=topology),
         )
         self.framework.observe(self.on.update_status, self._on_update_status)
 
@@ -73,8 +71,23 @@ class OtlpProviderCharm(CharmBase):
 class OtlpDualCharm(CharmBase):
     def __init__(self, framework: ops.Framework):
         super().__init__(framework)
-        self.charm_root = self.charm_dir.absolute()
         self.otlp_provider = OtlpProvider(self)
+
+        topology = JujuTopology.from_charm(self)
+        rules = MyRules(topology=topology)
+        self.charm_root = self.charm_dir.absolute()
+        rules.add_logql_path(
+            self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')), recursive=True
+        )
+        rules.add_promql_path(
+            self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')), recursive=True
+        )
+        self.otlp_consumer = OtlpConsumer(
+            self,
+            protocols=['http', 'grpc'],
+            telemetries=['metrics', 'logs'],
+            rules=rules,
+        )
         self.framework.observe(self.on.update_status, self._on_update_status)
 
     def _on_update_status(self, event: ops.EventBase) -> None:
@@ -93,22 +106,6 @@ class OtlpDualCharm(CharmBase):
                 dest_path=self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')),
             )
 
-        topology = JujuTopology.from_charm(self)
-        loki_rules = AlertRules(query_type='logql', topology=topology)
-        prom_rules = AlertRules(query_type='promql', topology=topology)
-        loki_rules.add_path(
-            self.charm_root.joinpath(*LOKI_RULES_DEST_PATH.split('/')), recursive=True
-        )
-        prom_rules.add_path(
-            self.charm_root.joinpath(*METRICS_RULES_DEST_PATH.split('/')), recursive=True
-        )
-
-        self.otlp_consumer = OtlpConsumer(
-            self,
-            protocols=['http', 'grpc'],
-            telemetries=['metrics', 'logs'],
-            rules=RulesInput(loki=loki_rules, prometheus=prom_rules),
-        )
         self.otlp_provider.publish()
         self.otlp_consumer.publish()
 

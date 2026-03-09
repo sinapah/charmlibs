@@ -16,7 +16,7 @@ classifiers = [
 dynamic = ["version"]
 dependencies = [
     # "ops",
-    "cosl>=1.5.0",
+    "cosl @ git+https://github.com/canonical/cos-lib@feat/rules-v2",
     "requests",
 ]
 
@@ -47,6 +47,9 @@ packages = ["src/charmlibs"]
 
 [tool.hatch.version]
 path = "src/charmlibs/otlp/_version.py"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 extend = "../../pyproject.toml"

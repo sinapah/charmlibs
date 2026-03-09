@@ -146,14 +146,11 @@ from ._otlp import (
     DEFAULT_LOKI_RULES_RELATIVE_PATH,
     DEFAULT_PROM_RULES_RELATIVE_PATH,
     DEFAULT_PROVIDER_RELATION_NAME,
-    AlertRules,
-    JujuTopology,
     OtlpConsumer,
     OtlpConsumerAppData,
     OtlpEndpoint,
     OtlpProvider,
     OtlpProviderAppData,
-    RulesInput,
     RulesModel,
 )
 from ._version import __version__ as __version__
@@ -165,13 +162,10 @@ __all__ = [
     'DEFAULT_LOKI_RULES_RELATIVE_PATH',
     'DEFAULT_PROM_RULES_RELATIVE_PATH',
     'DEFAULT_PROVIDER_RELATION_NAME',
-    'AlertRules',
-    'JujuTopology',
     'OtlpConsumer',
     'OtlpConsumerAppData',
     'OtlpEndpoint',
     'OtlpProvider',
     'OtlpProviderAppData',
-    'RulesInput',
     'RulesModel',
 ]

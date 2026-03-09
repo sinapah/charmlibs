@@ -24,12 +24,11 @@ import json
 import logging
 from collections import OrderedDict
 from collections.abc import Sequence
-from dataclasses import dataclass
 from lzma import LZMAError
 from typing import Any, Literal
 
 from cosl.juju_topology import JujuTopology
-from cosl.rules import AlertRules, InjectResult, Rules, generic_alert_groups
+from cosl.rules import InjectResult, MyRules, generic_alert_groups
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
@@ -42,12 +41,6 @@ DEFAULT_PROM_RULES_RELATIVE_PATH = './src/prometheus_alert_rules'
 
 
 logger = logging.getLogger(__name__)
-
-
-@dataclass
-class RulesInput:
-    loki: Rules | None = None
-    prometheus: Rules | None = None
 
 
 class RulesModel(BaseModel):
@@ -129,15 +122,13 @@ class OtlpConsumer(Object):
             promql) that the consumer will publish to the provider.
     """
 
-    _rules_cls = AlertRules
-
     def __init__(
         self,
         charm: CharmBase,
         relation_name: str = DEFAULT_CONSUMER_RELATION_NAME,
         protocols: Sequence[Literal['http', 'grpc']] | None = None,
         telemetries: Sequence[Literal['logs', 'metrics', 'traces']] | None = None,
-        rules: RulesInput | None = None,
+        rules: MyRules | None = None,
     ):
         super().__init__(charm, relation_name)
         self._charm = charm
@@ -149,7 +140,7 @@ class OtlpConsumer(Object):
         self._telemetries: list[Literal['logs', 'metrics', 'traces']] = (
             list(telemetries) if telemetries is not None else []
         )
-        self._rules = rules if rules is not None else RulesInput(loki=None, prometheus=None)
+        self._rules = rules if rules is not None else MyRules(self._topology)
 
     def _filter_endpoints(self, endpoints: list[dict[str, str | list[str]]]) -> list[OtlpEndpoint]:
         """Filter out unsupported OtlpEndpoints.
@@ -193,24 +184,19 @@ class OtlpConsumer(Object):
             # Only the leader unit can write to app data.
             return
 
-        rules = {}
-        # Loki rules
-        if self._rules.loki is not None:
-            rules['logql'] = self._rules.loki.as_dict()
-
-        # Prometheus rules
-        if self._rules.prometheus is not None:
-            self._rules.prometheus.add(
-                copy.deepcopy(generic_alert_groups.aggregator_rules),
-                group_name_prefix=self._topology.identifier,
-            )
-            rules['promql'] = self._rules.prometheus.as_dict()
+        self._rules.add_promql_dict(
+            copy.deepcopy(generic_alert_groups.aggregator_rules),
+            group_name_prefix=self._topology.identifier,
+        )
 
         # Publish to databag
-        databag = OtlpConsumerAppData.model_validate({
-            'rules': rules,
-            'metadata': self._topology.as_dict(),
-        })
+        # TODO: I need to copy rules.py to my .venv and continue testing
+        databag = OtlpConsumerAppData.model_validate(
+            {
+                'rules': self._rules.as_dict(),
+                'metadata': self._topology.as_dict(),
+            }
+        )
         for relation in self.model.relations[self._relation_name]:
             relation.save(databag, self._charm.app, encoder=OtlpConsumerAppData.encode_value)
 
@@ -257,8 +243,6 @@ class OtlpProvider(Object):
         charm: The charm instance.
         relation_name: The name of the relation to use.
     """
-
-    _rules_cls = AlertRules
 
     def __init__(
         self,
@@ -309,28 +293,22 @@ class OtlpProvider(Object):
             a mapping of relation ID to a dictionary of alert rule groups
             following the OfficialRuleFileFormat from cos-lib.
         """
+        rules_obj = MyRules(self._topology)
         rules_map: dict[str, dict[str, Any]] = {}
-
-        rules_obj = self._rules_cls(query_type, self._topology)
-
         for relation in self.model.relations[self._relation_name]:
             consumer = relation.load(
                 OtlpConsumerAppData, relation.app, decoder=OtlpConsumerAppData.decode_value
             )
 
             # get rules for the desired query type
-            rules_for_type: dict[str, Any] | None = getattr(
-                consumer.rules, getattr(rules_obj, 'query_type', query_type), None
-            )
+            rules_for_type: dict[str, Any] | None = getattr(consumer.rules, query_type, None)
             if not rules_for_type:
                 continue
 
-            if not hasattr(rules_obj, 'inject_and_validate_rules'):
+            if not hasattr(rules_obj, 'inject_and_validate'):
                 continue
 
-            result: InjectResult = rules_obj.inject_and_validate_rules(
-                rules_for_type, consumer.metadata
-            )
+            result: InjectResult = rules_obj.inject_and_validate(rules_for_type, consumer.metadata, query_type)
             if result.errmsg:
                 if self._charm.unit.is_leader():
                     relation.data[self._charm.app]['event'] = json.dumps({'errors': result.errmsg})
