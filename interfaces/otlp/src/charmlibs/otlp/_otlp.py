@@ -49,22 +49,34 @@ logger = logging.getLogger(__name__)
 class RulesModel(BaseModel):
     """Rules of various formats (query languages) to support in the relation databag."""
 
-    logql: dict[str, Any] = Field(description="LogQL alerting and recording rules, following the OfficialRuleFileFormat from cos-lib.")
-    promql: dict[str, Any] = Field(description="PromQL alerting and recording rules, following the OfficialRuleFileFormat from cos-lib.")
+    logql: dict[str, Any] = Field(
+        description='LogQL alerting and recording rules, following the '
+        'OfficialRuleFileFormat from cos-lib.'
+    )
+    promql: dict[str, Any] = Field(
+        description='PromQL alerting and recording rules, following the '
+        'OfficialRuleFileFormat from cos-lib.'
+    )
 
 
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    protocol: Literal['http', 'grpc'] = Field(description="Transport protocol used to send telemetry data to this endpoint.")
+    protocol: Literal['http', 'grpc'] = Field(
+        description='Transport protocol used to send telemetry data to this endpoint.'
+    )
     endpoint: str = Field(description="URL of the OTLP endpoint (e.g. 'http://collector:4318').")
-    telemetries: Sequence[Literal['logs', 'metrics', 'traces']] = Field(description="Telemetry signal types accepted by this endpoint.")
+    telemetries: Sequence[Literal['logs', 'metrics', 'traces']] = Field(
+        description='Telemetry signal types accepted by this endpoint.'
+    )
 
 
 class OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's app databag."""
 
-    endpoints: list[OtlpEndpoint] = Field(description="List of OTLP endpoints exposed by the provider.")
+    endpoints: list[OtlpEndpoint] = Field(
+        description='List of OTLP endpoints exposed by the provider.'
+    )
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -76,12 +88,19 @@ class OtlpConsumerAppData(BaseModel):
     ```bash
     <rules-from-show-unit> | base64 -d | xz -d | jq
     ```
-    rules: a dictionary of rules following the OfficialRuleFileFormat from cos-lib, indexed by query type (e.g. logql, promql).
+    rules: a dictionary of rules following the OfficialRuleFileFormat from cos-lib,
+      indexed by query type (e.g. logql, promql).
     metadata: Juju topology of the current charm, used for labeling rule expressions and labels.
     """
 
-    rules: RulesModel | str = Field(description="Alerting and recording rules to be forwarded to the provider. Stored as an LZMA-compressed, base64-encoded JSON string when the payload is large.")
-    metadata: OrderedDict[str, str] = Field(description="Juju topology of the consumer charm (e.g. model, app, unit), used to label rule expressions and alert routing.")
+    rules: RulesModel | str = Field(
+        description='Alerting and recording rules to be forwarded to the provider.'
+        ' Stored as an LZMA-compressed, base64-encoded JSON string when the payload is large.'
+    )
+    metadata: OrderedDict[str, str] = Field(
+        description='Juju topology of the consumer charm (e.g. model, app, unit),'
+        ' used to label rule expressions and alert routing.'
+    )
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
@@ -95,8 +114,9 @@ class OtlpConsumerAppData(BaseModel):
     @staticmethod
     def encode_value(obj: Any) -> str:
         """Encode relation data values into a string.
-        
-        Rules are LZMA-compressed and base64-encoded to reduce content size for larger deployments. Other data is serialized into a JSON formatted str.
+
+        Rules are LZMA-compressed and base64-encoded to reduce content size for larger deployments.
+        Other data is serialized into a JSON formatted str.
         """
         try:
             RulesModel.model_validate(obj)
