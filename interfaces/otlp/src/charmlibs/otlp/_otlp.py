@@ -19,6 +19,7 @@ shared between charms that intend to provide or consume OTLP telemetry.
 For user-facing documentation, see the package-level docstring in __init__.py.
 """
 
+import binascii
 import copy
 import hashlib
 import json
@@ -34,7 +35,7 @@ from cosl.rules import AlertRules, InjectResult, generic_alert_groups
 from cosl.utils import LZMABase64
 from ops import CharmBase
 from ops.framework import Object
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 
 DEFAULT_CONSUMER_RELATION_NAME = 'send-otlp'
 DEFAULT_PROVIDER_RELATION_NAME = 'receive-otlp'
@@ -48,22 +49,22 @@ logger = logging.getLogger(__name__)
 class RulesModel(BaseModel):
     """Rules of various formats (query languages) to support in the relation databag."""
 
-    logql: dict[str, Any]
-    promql: dict[str, Any]
+    logql: dict[str, Any] = Field(description="LogQL alerting and recording rules, following the OfficialRuleFileFormat from cos-lib.")
+    promql: dict[str, Any] = Field(description="PromQL alerting and recording rules, following the OfficialRuleFileFormat from cos-lib.")
 
 
 class OtlpEndpoint(BaseModel):
     """A pydantic model for a single OTLP endpoint."""
 
-    protocol: Literal['http', 'grpc']
-    endpoint: str
-    telemetries: Sequence[Literal['logs', 'metrics', 'traces']]
+    protocol: Literal['http', 'grpc'] = Field(description="Transport protocol used to send telemetry data to this endpoint.")
+    endpoint: str = Field(description="URL of the OTLP endpoint (e.g. 'http://collector:4318').")
+    telemetries: Sequence[Literal['logs', 'metrics', 'traces']] = Field(description="Telemetry signal types accepted by this endpoint.")
 
 
 class OtlpProviderAppData(BaseModel):
     """A pydantic model for the OTLP provider's app databag."""
 
-    endpoints: list[OtlpEndpoint]
+    endpoints: list[OtlpEndpoint] = Field(description="List of OTLP endpoints exposed by the provider.")
 
 
 class OtlpConsumerAppData(BaseModel):
@@ -79,20 +80,17 @@ class OtlpConsumerAppData(BaseModel):
     metadata: Juju topology of the current charm, used for labeling rule expressions and labels.
     """
 
-    rules: RulesModel | str
-    metadata: OrderedDict[str, str]
+    rules: RulesModel | str = Field(description="Alerting and recording rules to be forwarded to the provider. Stored as an LZMA-compressed, base64-encoded JSON string when the payload is large.")
+    metadata: OrderedDict[str, str] = Field(description="Juju topology of the consumer charm (e.g. model, app, unit), used to label rule expressions and alert routing.")
 
     @staticmethod
     def decode_value(json_str: str) -> Any:
         """Decode relation data values using BaseModel validation."""
         try:
+            decompressed = LZMABase64.decompress(json_str)
+            return RulesModel.model_validate(json.loads(decompressed))
+        except (LZMAError, binascii.Error):
             return json.loads(json_str)
-        except json.JSONDecodeError:
-            try:
-                decompressed = LZMABase64.decompress(json_str)
-                return RulesModel.model_validate(json.loads(decompressed))
-            except (json.JSONDecodeError, ValidationError, LZMAError):
-                return ''
 
     @staticmethod
     def encode_value(obj: Any) -> str:
