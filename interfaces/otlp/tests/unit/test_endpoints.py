@@ -13,7 +13,7 @@ from ops import testing
 from ops.testing import Relation, State
 from pydantic import ValidationError
 
-from charmlibs.otlp import OtlpEndpoint, OtlpProviderAppData
+from charmlibs.interfaces.otlp import OtlpEndpoint, OtlpProviderAppData
 
 ALL_PROTOCOLS = ['grpc', 'http']
 ALL_TELEMETRIES = ['logs', 'metrics', 'traces']
