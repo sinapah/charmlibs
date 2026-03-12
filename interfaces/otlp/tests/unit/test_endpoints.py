@@ -29,13 +29,13 @@ def test_new_endpoint_key_is_ignored_by_databag_model() -> None:
     # GIVEN the provider offers a new endpoint type (protocol or telemetry)
     # * the requirer does not support this new endpoint type
     # WHEN validating the provider databag model, which the requirer uses to access endpoints
-    # THEN the validation succeeds
     endpoint = {
         'protocol': 'new_protocol',
         'endpoint': 'http://host:4317',
         'telemetries': ['logs'],
         'new_key': 'value',
     }
+    # THEN the validation succeeds
     provider_databag: OtlpProviderAppData = OtlpProviderAppData.model_validate({
         'endpoints': [endpoint]
     })
