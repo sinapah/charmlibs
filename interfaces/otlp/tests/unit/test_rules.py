@@ -85,10 +85,12 @@ def _decompress(rules: str | None) -> dict[str, Any]:
 def test_new_rule_is_ignored_by_databag_model() -> None:
     # GIVEN the requirer offers a new rule type
     # * the provider does not support this new rule type
-    rules: dict[str, dict[str, Any]] = {'promql': {}, 'new_rule': {}}
     # WHEN validating the requirer databag model, which the provider uses to access rules
     # THEN the validation succeeds
-    requirer_databag = OtlpRequirerAppData.model_validate({'rules': rules, 'metadata': METADATA})
+    requirer_databag = OtlpRequirerAppData.model_validate({
+        'rules': {'promql': {}, 'new_rule': {}},
+        'metadata': METADATA,
+    })
     assert requirer_databag
     assert isinstance(requirer_databag.rules, RulesModel)
     # AND the new rule type is ignored
@@ -98,10 +100,9 @@ def test_new_rule_is_ignored_by_databag_model() -> None:
 def test_missing_rule_type_defaults() -> None:
     # GIVEN the requirer offers a new rule type
     # * the provider does not support this new rule type
-    rules: dict[str, dict[str, Any]] = {}
     # WHEN validating the requirer databag model, which the provider uses to access rules
     # THEN the validation succeeds
-    requirer_databag = OtlpRequirerAppData.model_validate({'rules': rules, 'metadata': METADATA})
+    requirer_databag = OtlpRequirerAppData.model_validate({'rules': {}, 'metadata': METADATA})
     assert requirer_databag
     assert isinstance(requirer_databag.rules, RulesModel)
     # AND the new rule type is ignored
