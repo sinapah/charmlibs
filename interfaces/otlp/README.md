@@ -69,8 +69,6 @@ class MyOtlpSender(CharmBase):
         self.otlp_requirer.publish()
         # get the endpoints from the provider
         supported_endpoints = self.otlp_requirer.endpoints
-        # If multiple endpoints are offered on the provider side, the more modern
-        # is selected. That is to say, `gRPC` is preferred over `HTTP`
 ```
 
 ## Documentation
