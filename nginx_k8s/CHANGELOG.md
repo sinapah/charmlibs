@@ -1,3 +1,6 @@
+# 1.0.1 - 22 June 2026
+This change fixes an issue with the CA cert path expected by _tls_config. 
+
 # 0.1.0 - 24 October 2025
 
 This includes a few features that were introduced in the parent library while this one was being reviewed, approved and merged.
